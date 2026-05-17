@@ -1,0 +1,15 @@
+export type UserRole = "employee" | "manager" | "admin";
+export type GoalSheetStatus = "draft" | "submitted" | "approved" | "rejected";
+export type UomType = "min_numeric" | "max_numeric" | "min_percent" | "max_percent" | "timeline" | "zero";
+export type CheckinStatus = "not_started" | "on_track" | "completed";
+export type QuarterType = "Q1" | "Q2" | "Q3" | "Q4";
+export type CycleStatus = "draft" | "active" | "closed";
+export type AuditAction = "create" | "update" | "delete" | "submit" | "approve" | "reject" | "unlock" | "push_shared";
+export interface Profile { id:string; email:string; full_name:string; role:UserRole; department:string|null; designation:string|null; manager_id:string|null; is_active:boolean; created_at:string; updated_at:string; }
+export interface PerformanceCycle { id:string; name:string; financial_year:string; start_date:string; end_date:string; goal_setting_start:string; goal_setting_end:string; q1_start:string|null; q1_end:string|null; q2_start:string|null; q2_end:string|null; q3_start:string|null; q3_end:string|null; q4_start:string|null; q4_end:string|null; status:CycleStatus; created_by:string|null; created_at:string; updated_at:string; }
+export interface ThrustArea { id:string; name:string; description:string|null; department:string|null; is_active:boolean; created_at:string; }
+export interface GoalSheet { id:string; employee_id:string; cycle_id:string; status:GoalSheetStatus; submitted_at:string|null; approved_at:string|null; approved_by:string|null; rejection_reason:string|null; is_locked:boolean; total_weightage:number; created_at:string; updated_at:string; employee?:Profile; goals?:Goal[]; cycle?:PerformanceCycle; }
+export interface Goal { id:string; goal_sheet_id:string; thrust_area_id:string|null; title:string; description:string|null; uom_type:UomType; target_value:number|null; target_date:string|null; weightage:number; sort_order:number; is_shared:boolean; shared_from_goal_id:string|null; shared_owner_id:string|null; is_title_locked:boolean; is_target_locked:boolean; created_at:string; updated_at:string; thrust_area?:ThrustArea; checkins?:Checkin[]; goal_sheet?:GoalSheet; }
+export interface Checkin { id:string; goal_id:string; goal_sheet_id:string; quarter:QuarterType; cycle_id:string; planned_value:number|null; actual_value:number|null; actual_date:string|null; status:CheckinStatus; progress_score:number; employee_comments:string|null; manager_comments:string|null; manager_reviewed:boolean; manager_reviewed_at:string|null; manager_reviewed_by:string|null; created_at:string; updated_at:string; goal?:Goal; }
+export interface AuditLog { id:string; entity_type:string; entity_id:string; action:AuditAction; changed_by:string; old_values:Record<string,unknown>|null; new_values:Record<string,unknown>|null; description:string|null; ip_address:string|null; created_at:string; changed_by_profile?:Profile; }
+export interface GoalFormData { thrust_area_id:string; title:string; description:string; uom_type:UomType; target_value:number|null; target_date:string|null; weightage:number; }
