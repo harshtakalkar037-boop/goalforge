@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Target, CheckSquare, Users, ClipboardCheck, MessageSquare,
   Calendar, Share2, FileText, BarChart3, LogOut, Bell, Settings, Trophy,
-  Briefcase, BookOpen, Sparkles
+  Briefcase, BookOpen, Sparkles, ChevronRight
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -17,96 +17,136 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Calendar, Share2, FileText, BarChart3, Bell, Settings, Trophy, Briefcase, BookOpen, Sparkles,
 };
 
-const navItems: Record<UserRole, { href: string; label: string; icon: string; badge?: string }[]> = {
+const navItems: Record<UserRole, { href: string; label: string; icon: string; badge?: string; group?: string }[]> = {
   employee: [
-    { href: "/dashboard/employee", label: "Dashboard", icon: "LayoutDashboard" },
-    { href: "/dashboard/employee/goals", label: "My Goals", icon: "Target" },
-    { href: "/dashboard/employee/checkins", label: "Check-ins", icon: "CheckSquare" },
-    { href: "/dashboard/objectives", label: "Objectives", icon: "BookOpen" },
-    { href: "/dashboard/projects", label: "Projects", icon: "Briefcase" },
-    { href: "/dashboard/leaderboard", label: "Leaderboard", icon: "Trophy" },
-    { href: "/dashboard/notifications", label: "Notifications", icon: "Bell", badge: "4" },
-    { href: "/dashboard/reports", label: "Reports", icon: "FileText" },
-    { href: "/dashboard/settings", label: "Settings", icon: "Settings" },
+    { href: "/dashboard/employee", label: "Dashboard", icon: "LayoutDashboard", group: "Overview" },
+    { href: "/dashboard/employee/goals", label: "My Goals", icon: "Target", group: "Work" },
+    { href: "/dashboard/employee/checkins", label: "Check-ins", icon: "CheckSquare", group: "Work" },
+    { href: "/dashboard/objectives", label: "Objectives", icon: "BookOpen", group: "Work" },
+    { href: "/dashboard/projects", label: "Projects", icon: "Briefcase", group: "Work" },
+    { href: "/dashboard/leaderboard", label: "Leaderboard", icon: "Trophy", group: "Insights" },
+    { href: "/dashboard/reports", label: "Reports", icon: "FileText", group: "Insights" },
+    { href: "/dashboard/notifications", label: "Notifications", icon: "Bell", badge: "4", group: "System" },
+    { href: "/dashboard/settings", label: "Settings", icon: "Settings", group: "System" },
   ],
   manager: [
-    { href: "/dashboard/manager", label: "Dashboard", icon: "LayoutDashboard" },
-    { href: "/dashboard/manager/team", label: "Team Overview", icon: "Users" },
-    { href: "/dashboard/manager/approvals", label: "Approvals", icon: "ClipboardCheck", badge: "3" },
-    { href: "/dashboard/manager/checkins", label: "Team Check-ins", icon: "MessageSquare" },
-    { href: "/dashboard/objectives", label: "Objectives", icon: "BookOpen" },
-    { href: "/dashboard/projects", label: "Projects", icon: "Briefcase" },
-    { href: "/dashboard/leaderboard", label: "Leaderboard", icon: "Trophy" },
-    { href: "/dashboard/notifications", label: "Notifications", icon: "Bell", badge: "2" },
-    { href: "/dashboard/reports", label: "Reports", icon: "FileText" },
-    { href: "/dashboard/settings", label: "Settings", icon: "Settings" },
+    { href: "/dashboard/manager", label: "Dashboard", icon: "LayoutDashboard", group: "Overview" },
+    { href: "/dashboard/manager/team", label: "Team Overview", icon: "Users", group: "Team" },
+    { href: "/dashboard/manager/approvals", label: "Approvals", icon: "ClipboardCheck", badge: "3", group: "Team" },
+    { href: "/dashboard/manager/checkins", label: "Team Check-ins", icon: "MessageSquare", group: "Team" },
+    { href: "/dashboard/objectives", label: "Objectives", icon: "BookOpen", group: "Work" },
+    { href: "/dashboard/projects", label: "Projects", icon: "Briefcase", group: "Work" },
+    { href: "/dashboard/leaderboard", label: "Leaderboard", icon: "Trophy", group: "Insights" },
+    { href: "/dashboard/reports", label: "Reports", icon: "FileText", group: "Insights" },
+    { href: "/dashboard/notifications", label: "Notifications", icon: "Bell", badge: "2", group: "System" },
+    { href: "/dashboard/settings", label: "Settings", icon: "System" },
   ],
   admin: [
-    { href: "/dashboard/admin", label: "Dashboard", icon: "LayoutDashboard" },
-    { href: "/dashboard/admin/cycles", label: "Cycles", icon: "Calendar" },
-    { href: "/dashboard/admin/shared-goals", label: "Shared Goals", icon: "Share2" },
-    { href: "/dashboard/admin/users", label: "Users", icon: "Users" },
-    { href: "/dashboard/admin/audit", label: "Audit Log", icon: "FileText" },
-    { href: "/dashboard/admin/analytics", label: "Analytics", icon: "BarChart3" },
-    { href: "/dashboard/objectives", label: "Objectives", icon: "BookOpen" },
-    { href: "/dashboard/projects", label: "Projects", icon: "Briefcase" },
-    { href: "/dashboard/notifications", label: "Notifications", icon: "Bell" },
-    { href: "/dashboard/reports", label: "Reports", icon: "FileText" },
-    { href: "/dashboard/settings", label: "Settings", icon: "Settings" },
+    { href: "/dashboard/admin", label: "Dashboard", icon: "LayoutDashboard", group: "Overview" },
+    { href: "/dashboard/admin/cycles", label: "Cycles", icon: "Calendar", group: "Admin" },
+    { href: "/dashboard/admin/shared-goals", label: "Shared Goals", icon: "Share2", group: "Admin" },
+    { href: "/dashboard/admin/users", label: "Users", icon: "Users", group: "Admin" },
+    { href: "/dashboard/admin/audit", label: "Audit Log", icon: "FileText", group: "Admin" },
+    { href: "/dashboard/admin/analytics", label: "Analytics", icon: "BarChart3", group: "Admin" },
+    { href: "/dashboard/objectives", label: "Objectives", icon: "BookOpen", group: "Work" },
+    { href: "/dashboard/projects", label: "Projects", icon: "Briefcase", group: "Work" },
+    { href: "/dashboard/notifications", label: "Notifications", icon: "Bell", group: "System" },
+    { href: "/dashboard/settings", label: "Settings", icon: "Settings", group: "System" },
   ],
 };
 
-export function Sidebar({ role, onSignOut }: { role: UserRole; onSignOut: () => void }) {
+export function Sidebar({ role, onSignOut, user }: { role: UserRole; onSignOut: () => void; user?: { full_name: string; email: string; role: string } }) {
   const pathname = usePathname();
   const items = navItems[role] || [];
 
+  // Group items
+  const groups: Record<string, typeof items> = {};
+  items.forEach(item => {
+    const g = item.group || "Other";
+    if (!groups[g]) groups[g] = [];
+    groups[g].push(item);
+  });
+
   return (
-    <div className="flex h-full w-64 flex-col border-r bg-card">
-      <div className="flex h-16 items-center border-b px-6">
-        <Link href="/dashboard" className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-            <Target className="h-5 w-5 text-primary-foreground" />
+    <div className="flex h-full w-64 flex-col sidebar-gradient">
+      {/* Logo */}
+      <div className="flex h-16 items-center border-b border-white/10 px-5">
+        <Link href="/dashboard" className="flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/15 ring-1 ring-white/20">
+            <Target className="h-5 w-5 text-white" />
           </div>
           <div>
-            <span className="text-lg font-bold leading-none">GoalForge</span>
-            <p className="text-xs text-muted-foreground leading-none mt-0.5">Enterprise</p>
+            <span className="text-base font-bold text-white leading-none">GoalForge</span>
+            <p className="text-[10px] text-white/50 leading-none mt-0.5 uppercase tracking-widest">Enterprise</p>
           </div>
         </Link>
       </div>
 
       <ScrollArea className="flex-1 px-3 py-4">
-        <nav className="space-y-1">
-          {items.map(item => {
-            const Icon = iconMap[item.icon] || LayoutDashboard;
-            const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                  isActive
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                )}
-              >
-                <Icon className="h-4 w-4 shrink-0" />
-                <span className="flex-1">{item.label}</span>
-                {item.badge && (
-                  <Badge className={cn("text-xs h-5 min-w-5 flex items-center justify-center px-1.5", isActive ? "bg-white/20 text-white" : "bg-red-100 text-red-700")}>
-                    {item.badge}
-                  </Badge>
-                )}
-              </Link>
-            );
-          })}
+        <nav className="space-y-5">
+          {Object.entries(groups).map(([groupName, groupItems]) => (
+            <div key={groupName}>
+              <p className="px-3 mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-white/35">{groupName}</p>
+              <div className="space-y-0.5">
+                {groupItems.map(item => {
+                  const Icon = iconMap[item.icon] || LayoutDashboard;
+                  const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href + "/"));
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={cn(
+                        "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150",
+                        isActive
+                          ? "bg-white/15 text-white shadow-sm"
+                          : "text-white/60 hover:bg-white/8 hover:text-white/90"
+                      )}
+                    >
+                      <div className={cn(
+                        "flex h-6 w-6 items-center justify-center rounded-lg transition-all",
+                        isActive ? "bg-white/20" : "group-hover:bg-white/10"
+                      )}>
+                        <Icon className="h-3.5 w-3.5" />
+                      </div>
+                      <span className="flex-1">{item.label}</span>
+                      {item.badge && (
+                        <span className={cn(
+                          "text-[10px] font-bold h-5 min-w-5 flex items-center justify-center px-1.5 rounded-full",
+                          isActive ? "bg-white/25 text-white" : "bg-red-500/80 text-white"
+                        )}>
+                          {item.badge}
+                        </span>
+                      )}
+                      {isActive && <ChevronRight className="h-3 w-3 text-white/40" />}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </nav>
       </ScrollArea>
 
-      <div className="border-t p-3">
-        <Button variant="ghost" className="w-full justify-start gap-3 text-muted-foreground" onClick={onSignOut}>
-          <LogOut className="h-4 w-4" />Sign Out
-        </Button>
+      {/* User footer */}
+      <div className="border-t border-white/10 p-3">
+        {user && (
+          <div className="flex items-center gap-3 rounded-xl px-3 py-2.5 mb-1">
+            <div className="h-8 w-8 rounded-full bg-gradient-to-br from-violet-400 to-indigo-600 flex items-center justify-center text-white text-xs font-bold shrink-0">
+              {user.full_name?.charAt(0) || "U"}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold text-white truncate">{user.full_name}</p>
+              <p className="text-[10px] text-white/45 capitalize">{user.role}</p>
+            </div>
+          </div>
+        )}
+        <button
+          onClick={onSignOut}
+          className="w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-white/50 hover:bg-white/8 hover:text-white/80 transition-colors"
+        >
+          <LogOut className="h-4 w-4" />
+          <span>Sign out</span>
+        </button>
       </div>
     </div>
   );
