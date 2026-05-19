@@ -1,93 +1,106 @@
 "use client";
-
-import { Trophy, Medal, Star, TrendingUp, Award } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { Trophy, Medal, TrendingUp, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { createClient } from "@/lib/supabase/client";
+import { useUser } from "@/hooks/use-user";
 
-const leaderboard = [
-  { rank: 1, name: "Ravi Menon", dept: "Quality", score: 91, badges: 5, streak: 4, change: "same" },
-  { rank: 2, name: "Priya Sharma", dept: "Engineering", score: 84, badges: 4, streak: 3, change: "up" },
-  { rank: 3, name: "Lalita Rao", dept: "Strategy", score: 82, badges: 3, streak: 2, change: "up" },
-  { rank: 4, name: "Meena Joshi", dept: "Analytics", score: 78, badges: 3, streak: 2, change: "down" },
-  { rank: 5, name: "Arun Pillai", dept: "Engineering", score: 67, badges: 2, streak: 1, change: "same" },
-  { rank: 6, name: "Anita Desai", dept: "Design", score: 62, badges: 2, streak: 0, change: "down" },
-  { rank: 7, name: "Suresh Kumar", dept: "Engineering", score: 55, badges: 1, streak: 0, change: "down" },
-  { rank: 8, name: "Vikram Nair", dept: "Engineering", score: 43, badges: 1, streak: 0, change: "down" },
-];
+interface LeaderEntry { id:string; name:string; dept:string|null; avgScore:number; goalsCount:number; checkinsCount:number; }
 
-const rankMedal = (rank: number) => {
-  if (rank === 1) return <Trophy className="h-5 w-5 text-yellow-500" />;
-  if (rank === 2) return <Medal className="h-5 w-5 text-gray-400" />;
-  if (rank === 3) return <Medal className="h-5 w-5 text-amber-700" />;
-  return <span className="text-sm font-bold text-muted-foreground w-5 text-center">#{rank}</span>;
-};
-
-const changeIcon = (change: string) => {
-  if (change === "up") return <span className="text-green-600 text-xs font-bold">↑</span>;
-  if (change === "down") return <span className="text-red-600 text-xs font-bold">↓</span>;
-  return <span className="text-muted-foreground text-xs">—</span>;
-};
+const MEDALS = ["🥇","🥈","🥉"];
 
 export default function LeaderboardPage() {
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Leaderboard</h1>
-        <p className="text-muted-foreground mt-1">Team performance rankings · FY 2025–26 Q2</p>
-      </div>
+  const { user } = useUser();
+  const supabase = createClient();
+  const [entries, setEntries] = useState<LeaderEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [quarter, setQuarter] = useState("all");
 
-      {/* Podium */}
-      <div className="grid grid-cols-3 gap-4 max-w-xl mx-auto">
-        {[leaderboard[1], leaderboard[0], leaderboard[2]].map((p, i) => (
-          <Card key={p.rank} className={`text-center ${i === 1 ? "border-yellow-300 bg-yellow-50/50 -mt-4" : ""}`}>
-            <CardContent className="p-4">
-              <div className="flex justify-center mb-2">{rankMedal(p.rank)}</div>
-              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-2 text-xs font-bold text-primary">
-                {p.name.split(" ").map(n => n[0]).join("")}
-              </div>
-              <p className="font-semibold text-xs leading-tight">{p.name.split(" ")[0]}</p>
-              <p className={`text-lg font-bold mt-1 ${i === 1 ? "text-yellow-600" : "text-primary"}`}>{p.score}%</p>
-            </CardContent>
-          </Card>
+  const load = useCallback(async () => {
+    setLoading(true);
+    const { data: cyc } = await supabase.from("performance_cycles").select("id").eq("status","active").maybeSingle();
+    if (!cyc) { setLoading(false); return; }
+    const { data: sheets } = await supabase.from("goal_sheets").select("id,employee_id,employee:profiles!goal_sheets_employee_id_fkey(full_name,department),goals(weightage,checkins(*))").eq("cycle_id",cyc.id).eq("status","approved");
+    const result: LeaderEntry[] = [];
+    (sheets||[]).forEach((sheet:Record<string,unknown>)=>{
+      const emp = sheet.employee as {full_name:string;department:string|null}|null;
+      const goals = sheet.goals as Record<string,unknown>[];
+      let totalScore = 0, count = 0;
+      let ciCount = 0;
+      (goals||[]).forEach((g:Record<string,unknown>)=>{
+        const checkins = (g.checkins as Record<string,unknown>[]) || [];
+        const filtered = quarter==="all" ? checkins : checkins.filter((c:Record<string,unknown>)=>c.quarter===quarter);
+        filtered.forEach((c:Record<string,unknown>)=>{
+          totalScore += (c.progress_score as number)||0;
+          count++;
+          if ((c.status as string)!=="not_started") ciCount++;
+        });
+      });
+      const avg = count > 0 ? Math.round(totalScore/count) : 0;
+      result.push({ id:sheet.employee_id as string, name:emp?.full_name||"—", dept:emp?.department||null, avgScore:avg, goalsCount:(goals||[]).length, checkinsCount:ciCount });
+    });
+    result.sort((a,b)=>b.avgScore-a.avgScore);
+    setEntries(result);
+    setLoading(false);
+  },[supabase,quarter]);
+
+  useEffect(()=>{load();},[load]);
+
+  const myRank = entries.findIndex(e=>e.id===user?.id)+1;
+
+  return (
+    <div className="space-y-6 page-fade">
+      <div>
+        <h1 className="text-2xl font-bold flex items-center gap-3"><Trophy className="h-7 w-7 text-amber-500"/>Leaderboard</h1>
+        <p className="text-muted-foreground text-sm mt-0.5">Performance rankings based on goal achievement scores</p>
+      </div>
+      <div className="flex gap-2">
+        {["all","Q1","Q2","Q3","Q4"].map(q=>(
+          <button key={q} onClick={()=>setQuarter(q)} className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${quarter===q?"bg-primary text-white":"border hover:bg-accent"}`}>{q==="all"?"All Quarters":q}</button>
         ))}
       </div>
-
-      {/* Full Table */}
-      <Card>
-        <CardHeader><CardTitle className="flex items-center gap-2 text-base"><TrendingUp className="h-4 w-4" />Full Rankings</CardTitle></CardHeader>
-        <CardContent className="p-0">
-          <div className="divide-y">
-            {leaderboard.map(person => (
-              <div key={person.rank} className={`flex items-center gap-4 p-4 hover:bg-accent/20 transition-colors ${person.name === "Priya Sharma" ? "bg-primary/5" : ""}`}>
-                <div className="w-8 flex justify-center shrink-0">{rankMedal(person.rank)}</div>
-                <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0 text-xs font-bold text-primary">
-                  {person.name.split(" ").map(n => n[0]).join("")}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <p className="text-sm font-medium">{person.name}</p>
-                    {person.name === "Priya Sharma" && <Badge className="text-xs bg-primary/10 text-primary">You</Badge>}
-                    {changeIcon(person.change)}
+      {myRank > 0 && (
+        <Card className="border-primary/20 bg-primary/4">
+          <CardContent className="p-4 flex items-center gap-3">
+            <Trophy className="h-5 w-5 text-primary shrink-0"/>
+            <p className="text-sm font-semibold">Your rank: <span className="text-primary">#{myRank}</span> of {entries.length} · Score: <span className="text-primary">{entries[myRank-1]?.avgScore||0}%</span></p>
+          </CardContent>
+        </Card>
+      )}
+      {loading ? (
+        <div className="flex items-center justify-center h-48"><Loader2 className="h-8 w-8 animate-spin text-primary"/></div>
+      ) : entries.length === 0 ? (
+        <Card className="border-dashed"><CardContent className="p-12 text-center"><Trophy className="h-12 w-12 mx-auto mb-4 text-muted-foreground/30"/><p className="font-semibold">No data yet</p><p className="text-muted-foreground text-sm mt-1">Leaderboard populates once check-ins are submitted.</p></CardContent></Card>
+      ) : (
+        <div className="space-y-2">
+          {entries.map((e,i)=>{
+            const isMe = e.id===user?.id;
+            return (
+              <Card key={e.id} className={`overflow-hidden transition-all ${isMe?"border-primary/30 bg-primary/4":"hover:shadow-sm"} ${i===0?"border-amber-300 bg-amber-50/50":i===1?"border-gray-300":i===2?"border-amber-700/30":""}`}>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 text-center shrink-0">
+                      {i<3 ? <span className="text-2xl">{MEDALS[i]}</span> : <span className="text-sm font-bold text-muted-foreground">#{i+1}</span>}
+                    </div>
+                    <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary shrink-0">{e.name.charAt(0)}</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold text-sm">{e.name}{isMe&&<span className="text-[10px] text-primary font-bold ml-1">(you)</span>}</p>
+                      </div>
+                      <p className="text-xs text-muted-foreground">{e.dept||"—"} · {e.goalsCount} goals · {e.checkinsCount} check-ins</p>
+                      <div className="flex items-center gap-2 mt-1.5">
+                        <Progress value={e.avgScore} className="h-1.5 flex-1"/>
+                        <span className={`text-xs font-bold shrink-0 ${e.avgScore>=80?"text-green-600":e.avgScore>=60?"text-yellow-600":e.avgScore>0?"text-red-500":"text-muted-foreground"}`}>{e.avgScore>0?`${e.avgScore}%`:"—"}</span>
+                      </div>
+                    </div>
                   </div>
-                  <p className="text-xs text-muted-foreground">{person.dept}</p>
-                </div>
-                <div className="hidden sm:flex items-center gap-1">
-                  {Array.from({ length: person.badges }).map((_, i) => (
-                    <Star key={i} className="h-3 w-3 text-yellow-400 fill-yellow-400" />
-                  ))}
-                </div>
-                {person.streak > 0 && (
-                  <Badge variant="outline" className="text-xs bg-orange-50 text-orange-700 border-orange-200 hidden sm:flex">🔥 {person.streak} streak</Badge>
-                )}
-                <div className="text-right shrink-0">
-                  <p className={`text-lg font-bold ${person.score >= 80 ? "text-green-600" : person.score >= 60 ? "text-yellow-600" : "text-red-600"}`}>{person.score}%</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

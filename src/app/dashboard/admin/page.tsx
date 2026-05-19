@@ -1,151 +1,111 @@
 "use client";
-
-import { Users, Calendar, Target, TrendingUp, BarChart3, Activity, Shield, Star } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { Users, Target, CheckCircle2, Clock, TrendingUp, BarChart3, Loader2, AlertTriangle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { SimpleBarChart } from "@/components/charts/bar-chart";
-import { AIInsights } from "@/components/dashboard/ai-insights";
+import { createClient } from "@/lib/supabase/client";
+import { useUser } from "@/hooks/use-user";
+import Link from "next/link";
 
-const kpis = [
-  { label: "Total Employees", value: "142", sub: "+8 this month", icon: Users, color: "text-blue-600", bg: "bg-blue-50" },
-  { label: "Total Managers", value: "18", sub: "across 7 depts", icon: Shield, color: "text-purple-600", bg: "bg-purple-50" },
-  { label: "Active Cycles", value: "1", sub: "FY 2025-26 Q2", icon: Calendar, color: "text-green-600", bg: "bg-green-50" },
-  { label: "Org Goal Completion", value: "68%", sub: "+5% from Q1", icon: Target, color: "text-orange-600", bg: "bg-orange-50" },
-  { label: "Avg Rating", value: "3.8/5", sub: "org-wide average", icon: Star, color: "text-yellow-600", bg: "bg-yellow-50" },
-];
+export default function AdminDashboard() {
+  const { user } = useUser();
+  const supabase = createClient();
+  const [stats, setStats] = useState({ employees: 0, submitted: 0, approved: 0, pending: 0, checkins: 0 });
+  const [loading, setLoading] = useState(true);
+  const [cycle, setCycle] = useState<Record<string,unknown>|null>(null);
+  const [deptData, setDeptData] = useState<{dept:string;submitted:number;total:number}[]>([]);
 
-const deptData = [
-  { label: "HR", value: 84, color: "#10b981" },
-  { label: "Design", value: 78, color: "#10b981" },
-  { label: "Eng", value: 72, color: "#10b981" },
-  { label: "Ops", value: 71, color: "#f59e0b" },
-  { label: "Sales", value: 65, color: "#f59e0b" },
-  { label: "Finance", value: 59, color: "#ef4444" },
-];
+  const load = useCallback(async () => {
+    setLoading(true);
+    const { data: cyc } = await supabase.from("performance_cycles").select("*").eq("status","active").maybeSingle();
+    setCycle(cyc);
+    const { count: empCount } = await supabase.from("profiles").select("*",{count:"exact",head:true}).eq("role","employee").eq("is_active",true);
+    if (cyc) {
+      const { data: sheets } = await supabase.from("goal_sheets").select("status, employee:profiles!goal_sheets_employee_id_fkey(department)").eq("cycle_id", cyc.id);
+      const submitted = (sheets||[]).filter((s:Record<string,unknown>) => s.status==="submitted").length;
+      const approved = (sheets||[]).filter((s:Record<string,unknown>) => s.status==="approved").length;
+      const { count: ciCount } = await supabase.from("checkins").select("*",{count:"exact",head:true}).eq("cycle_id", cyc.id);
+      setStats({ employees: empCount||0, submitted, approved, pending: submitted, checkins: ciCount||0 });
+      // dept breakdown
+      const deptMap: Record<string, {submitted:number;total:number}> = {};
+      (sheets||[]).forEach((s:Record<string,unknown>) => {
+        const dept = ((s.employee as Record<string,unknown>)?.department as string) || "Unknown";
+        if (!deptMap[dept]) deptMap[dept] = {submitted:0,total:0};
+        deptMap[dept].total++;
+        if (s.status==="submitted"||s.status==="approved") deptMap[dept].submitted++;
+      });
+      setDeptData(Object.entries(deptMap).map(([dept,v])=>({dept,...v})));
+    }
+    setLoading(false);
+  }, [supabase]);
 
-const ratingData = [
-  { label: "5 Stars", value: 22 },
-  { label: "4 Stars", value: 48 },
-  { label: "3 Stars", value: 41 },
-  { label: "2 Stars", value: 19 },
-  { label: "1 Star", value: 12 },
-];
+  useEffect(()=>{load();},[load]);
 
-const auditLogs = [
-  { action: "approve", msg: "Goal sheet approved for Priya Sharma", by: "Sunita Patel", time: "5m ago" },
-  { action: "create", msg: "New user registered: Karan Shah", by: "Admin", time: "1h ago" },
-  { action: "update", msg: "Q2 deadline extended to Oct 20", by: "Admin", time: "3h ago" },
-  { action: "reject", msg: "Goal sheet rejected for Suresh Kumar", by: "Sunita Patel", time: "5h ago" },
-  { action: "push", msg: "Shared goal pushed to 42 employees", by: "Admin", time: "Yesterday" },
-];
+  if (loading) return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary"/></div>;
 
-const actionColor: Record<string, string> = {
-  approve: "bg-green-100 text-green-700",
-  create: "bg-blue-100 text-blue-700",
-  update: "bg-yellow-100 text-yellow-700",
-  reject: "bg-red-100 text-red-700",
-  push: "bg-purple-100 text-purple-700",
-};
+  const completion = stats.employees > 0 ? Math.round(((stats.submitted+stats.approved)/stats.employees)*100) : 0;
 
-const adminInsights = [
-  { type: "warning" as const, title: "Department Alert", body: "Finance dept is at 59% avg progress — lowest in org. Recommend a manager sync this week." },
-  { type: "success" as const, title: "Strong Performance", body: "HR team leads the org at 84% avg. This is the 3rd consecutive quarter of top performance." },
-  { type: "prediction" as const, title: "Executive Forecast", body: "Organization is on track to achieve 74% weighted avg score by end of Q2, up from 63% in Q1." },
-];
-
-export default function AdminDashboardPage() {
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 page-fade">
       <div>
-        <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-        <p className="text-muted-foreground mt-1">Organization-wide performance overview · FY 2025–26</p>
+        <h1 className="text-2xl font-bold">Admin Dashboard</h1>
+        <p className="text-muted-foreground text-sm mt-0.5">{cycle ? `${cycle.name as string} · ${cycle.financial_year as string}` : "No active cycle"} · Organization overview</p>
       </div>
-
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-        {kpis.map((k) => (
-          <Card key={k.label}>
-            <CardContent className="p-4">
-              <div className={`h-8 w-8 rounded-lg ${k.bg} flex items-center justify-center mb-3`}>
-                <k.icon className={`h-4 w-4 ${k.color}`} />
-              </div>
-              <p className="text-2xl font-bold">{k.value}</p>
-              <p className="text-xs font-medium mt-0.5">{k.label}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">{k.sub}</p>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {[
+          {label:"Total Employees",value:stats.employees,icon:Users,color:"text-primary",bg:"bg-primary/10"},
+          {label:"Sheets Submitted",value:stats.submitted,icon:Clock,color:"text-blue-600",bg:"bg-blue-100"},
+          {label:"Sheets Approved",value:stats.approved,icon:CheckCircle2,color:"text-green-600",bg:"bg-green-100"},
+          {label:"Check-ins Logged",value:stats.checkins,icon:BarChart3,color:"text-violet-600",bg:"bg-violet-100"},
+        ].map(s=>(
+          <Card key={s.label} className="gradient-card border-primary/8">
+            <CardContent className="p-5">
+              <div className={`h-9 w-9 rounded-xl ${s.bg} flex items-center justify-center mb-3`}><s.icon className={`h-5 w-5 ${s.color}`}/></div>
+              <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{s.label}</p>
             </CardContent>
           </Card>
         ))}
       </div>
-
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2 space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <Card>
-              <CardHeader><CardTitle className="text-base">Department Progress</CardTitle></CardHeader>
-              <CardContent><SimpleBarChart data={deptData} /></CardContent>
-            </Card>
-            <Card>
-              <CardHeader><CardTitle className="text-base">Rating Distribution</CardTitle></CardHeader>
-              <CardContent><SimpleBarChart data={ratingData} /></CardContent>
-            </Card>
+      <Card className="gradient-card border-primary/10">
+        <CardHeader className="pb-3"><CardTitle className="text-base flex items-center gap-2"><TrendingUp className="h-4 w-4"/>Goal Sheet Completion</CardTitle></CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-4 mb-4">
+            <p className="text-4xl font-bold text-primary">{completion}%</p>
+            <div className="flex-1"><Progress value={completion} className="h-3"/><p className="text-xs text-muted-foreground mt-1">{stats.submitted+stats.approved} of {stats.employees} employees submitted</p></div>
           </div>
-
-          <Card>
-            <CardHeader><CardTitle className="text-base flex items-center gap-2"><TrendingUp className="h-4 w-4" />Department Breakdown</CardTitle></CardHeader>
-            <CardContent className="space-y-3">
-              {[
-                { dept: "HR", emp: 12, progress: 84 },
-                { dept: "Engineering", emp: 42, progress: 72 },
-                { dept: "Design", emp: 8, progress: 78 },
-                { dept: "Operations", emp: 24, progress: 71 },
-                { dept: "Sales", emp: 28, progress: 65 },
-                { dept: "Finance", emp: 18, progress: 59 },
-              ].map(d => (
-                <div key={d.dept}>
-                  <div className="flex items-center justify-between mb-1 text-sm">
-                    <span className="font-medium">{d.dept}</span>
-                    <span className="text-xs text-muted-foreground">{d.emp} employees · <span className={`font-bold ${d.progress >= 75 ? "text-green-600" : d.progress >= 65 ? "text-yellow-600" : "text-red-600"}`}>{d.progress}%</span></span>
-                  </div>
-                  <Progress value={d.progress} className="h-2" />
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="space-y-4">
-          <AIInsights insights={adminInsights} />
-
-          <Card>
-            <CardHeader><CardTitle className="text-base flex items-center gap-2"><Activity className="h-4 w-4" />Recent Audit Logs</CardTitle></CardHeader>
-            <CardContent className="space-y-3">
-              {auditLogs.map((log, i) => (
-                <div key={i} className="flex items-start gap-3">
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${actionColor[log.action]}`}>{log.action}</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs truncate">{log.msg}</p>
-                    <p className="text-xs text-muted-foreground">{log.by} · {log.time}</p>
-                  </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-
-          <div className="grid grid-cols-2 gap-3">
-            <Card className="bg-green-50 border-green-200">
-              <CardContent className="p-4 text-center">
-                <p className="text-2xl font-bold text-green-700">638</p>
-                <p className="text-xs text-green-600 mt-1">Total Goals</p>
-              </CardContent>
+          {stats.pending > 0 && (
+            <div className="flex items-center gap-2 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-sm">
+              <AlertTriangle className="h-4 w-4 shrink-0"/>{stats.pending} sheet{stats.pending!==1?"s":""} pending manager approval
+            </div>
+          )}
+        </CardContent>
+      </Card>
+      {deptData.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3"><CardTitle className="text-base">Completion by Department</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            {deptData.map(d=>(
+              <div key={d.dept}>
+                <div className="flex justify-between text-sm mb-1"><span className="font-medium">{d.dept}</span><span className="text-muted-foreground">{d.submitted}/{d.total}</span></div>
+                <Progress value={d.total>0?Math.round((d.submitted/d.total)*100):0} className="h-2"/>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+      <div className="grid sm:grid-cols-3 gap-4">
+        {[
+          {href:"/dashboard/admin/cycles",label:"Manage Cycles",desc:"Configure performance cycle windows"},
+          {href:"/dashboard/admin/shared-goals",label:"Shared Goals",desc:"Push KPIs to multiple employees"},
+          {href:"/dashboard/admin/audit",label:"Audit Log",desc:"Track all changes with full trail"},
+        ].map(l=>(
+          <Link key={l.href} href={l.href}>
+            <Card className="hover:shadow-md hover:border-primary/20 transition-all cursor-pointer h-full">
+              <CardContent className="p-4"><p className="font-semibold">{l.label}</p><p className="text-xs text-muted-foreground mt-1">{l.desc}</p></CardContent>
             </Card>
-            <Card className="bg-purple-50 border-purple-200">
-              <CardContent className="p-4 text-center">
-                <p className="text-2xl font-bold text-purple-700">12</p>
-                <p className="text-xs text-purple-600 mt-1">Shared Goals</p>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+          </Link>
+        ))}
       </div>
     </div>
   );
