@@ -19,7 +19,7 @@ export default function ManagerDashboard() {
   const load = useCallback(async () => {
     if (!user) return;
     setLoading(true);
-    const { data: cyc } = await supabase.from("performance_cycles").select("*").eq("status","active").maybeSingle();
+    const { data: cyc } = await supabase.from("performance_cycles").select("*").eq("status","active").order("created_at", { ascending: true }).limit(1).then(r => ({ data: r.data?.[0] ?? null }));
     setCycle(cyc);
     const { data: members } = await supabase.from("profiles").select("id,full_name,designation,department").eq("manager_id", user.id).eq("is_active",true);
     if (members && cyc) {

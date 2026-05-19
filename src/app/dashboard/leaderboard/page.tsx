@@ -19,7 +19,7 @@ export default function LeaderboardPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data: cyc } = await supabase.from("performance_cycles").select("id").eq("status","active").maybeSingle();
+    const { data: cyc } = await supabase.from("performance_cycles").select("id").eq("status","active").order("created_at", { ascending: true }).limit(1).then(r => ({ data: r.data?.[0] ?? null }));
     if (!cyc) { setLoading(false); return; }
     const { data: sheets } = await supabase.from("goal_sheets").select("id,employee_id,employee:profiles!goal_sheets_employee_id_fkey(full_name,department),goals(weightage,checkins(*))").eq("cycle_id",cyc.id).eq("status","approved");
     const result: LeaderEntry[] = [];

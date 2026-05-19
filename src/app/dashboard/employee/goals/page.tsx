@@ -237,11 +237,13 @@ export default function EmployeeGoalsPage() {
     setLoading(true);
     try {
       // Get active cycle
-      const { data: cycleData } = await supabase
+      const { data: cycleRows } = await supabase
         .from("performance_cycles")
         .select("*")
         .eq("status", "active")
-        .maybeSingle();
+        .order("created_at", { ascending: true })
+        .limit(1);
+      const cycleData = cycleRows?.[0] ?? null;
       setCycle(cycleData);
 
       // Get or create goal sheet

@@ -46,7 +46,7 @@ export default function ManagerCheckinsPage() {
       const { data: team } = await supabase.from("profiles").select("id, full_name, department").eq("manager_id", user.id);
       if (!team?.length) { setData([]); setLoading(false); return; }
 
-      const { data: cycle } = await supabase.from("performance_cycles").select("id").eq("status", "active").maybeSingle();
+      const { data: cycle } = await supabase.from("performance_cycles").select("id").eq("status", "active").order("created_at", { ascending: true }).limit(1).then(r => ({ data: r.data?.[0] ?? null }));
       if (!cycle) { setData([]); setLoading(false); return; }
 
       const teamIds = team.map((p: { id: string }) => p.id);

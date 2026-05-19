@@ -17,7 +17,7 @@ export default function AdminDashboard() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data: cyc } = await supabase.from("performance_cycles").select("*").eq("status","active").maybeSingle();
+    const { data: cyc } = await supabase.from("performance_cycles").select("*").eq("status","active").order("created_at", { ascending: true }).limit(1).then(r => ({ data: r.data?.[0] ?? null }));
     setCycle(cyc);
     const { count: empCount } = await supabase.from("profiles").select("*",{count:"exact",head:true}).eq("role","employee").eq("is_active",true);
     if (cyc) {

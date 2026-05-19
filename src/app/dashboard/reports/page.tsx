@@ -64,7 +64,7 @@ export default function ReportsPage() {
     setLoading(true);
     try {
       // Get active cycle
-      const { data: cycle } = await supabase.from("performance_cycles").select("*").eq("status", "active").maybeSingle();
+      const { data: cycle } = await supabase.from("performance_cycles").select("*").eq("status", "active").order("created_at", { ascending: true }).limit(1).then(r => ({ data: r.data?.[0] ?? null }));
       if (!cycle) { setLoading(false); return; }
 
       // Get all goal sheets with goals and checkins (admins/managers see all, employees see own)

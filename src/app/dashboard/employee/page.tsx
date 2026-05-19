@@ -22,10 +22,10 @@ export default function EmployeeDashboard() {
     if (!user) return;
     setLoading(true);
     try {
-      const { data: cycleData } = await supabase.from("performance_cycles").select("*").eq("status", "active").maybeSingle();
+      const { data: cycleData } = await supabase.from("performance_cycles").select("*").eq("status", "active").order("created_at", { ascending: true }).limit(1).then(r => ({ data: r.data?.[0] ?? null }));
       setCycle(cycleData);
       if (cycleData) {
-        const { data: sheetData } = await supabase.from("goal_sheets").select("*").eq("employee_id", user.id).eq("cycle_id", cycleData.id).maybeSingle();
+        const { data: sheetData } = await supabase.from("goal_sheets").select("*").eq("employee_id", user.id).eq("cycle_id", cycleData.id).order("created_at", { ascending: false }).limit(1).then(r => ({ data: r.data?.[0] ?? null }));
         setSheet(sheetData);
         if (sheetData) {
           const { data: goalsData } = await supabase.from("goals").select("*, thrust_area:thrust_areas(name)").eq("goal_sheet_id", sheetData.id).order("sort_order");

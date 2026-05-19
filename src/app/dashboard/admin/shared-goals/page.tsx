@@ -36,11 +36,11 @@ function PushGoalModal({ open, onClose, onSave, userId }: { open: boolean; onClo
     if (selectedEmployees.length === 0) { setError("Select at least one employee"); return; }
     setLoading(true); setError(null);
     try {
-      const { data: cycle } = await supabase.from("performance_cycles").select("id").eq("status", "active").maybeSingle();
+      const { data: cycle } = await supabase.from("performance_cycles").select("id").eq("status", "active").order("created_at", { ascending: true }).limit(1).then(r => ({ data: r.data?.[0] ?? null }));
       if (!cycle) throw new Error("No active cycle");
 
       for (const empId of selectedEmployees) {
-        let { data: sheet } = await supabase.from("goal_sheets").select("id, status, is_locked").eq("employee_id", empId).eq("cycle_id", cycle.id).maybeSingle();
+        let { data: sheet } = await supabase.from("goal_sheets").select("id, status, is_locked").eq("employee_id", empId).eq("cycle_id", cycle.id).order("created_at", { ascending: false }).limit(1).then(r => ({ data: r.data?.[0] ?? null }));
         if (!sheet) {
           const { data: newSheet } = await supabase.from("goal_sheets").insert({ employee_id: empId, cycle_id: cycle.id, status: "draft" }).select().single();
           sheet = newSheet;
