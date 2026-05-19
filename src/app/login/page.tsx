@@ -6,9 +6,11 @@ import { createClient } from "@/lib/supabase/client";
 import { AlertCircle, Loader2, Target, Sparkles, ArrowRight, Shield, TrendingUp, Users } from "lucide-react";
 
 const DEMO_USERS = [
-  { email: "admin@goalforge.com", password: "Admin@123456", role: "Admin", name: "Priya Sharma", title: "HR Director", color: "from-violet-500 to-purple-600" },
-  { email: "manager@goalforge.com", password: "Manager@123456", role: "Manager", name: "Rajesh Kumar", title: "Engineering Manager", color: "from-indigo-500 to-blue-600" },
-  { email: "employee1@goalforge.com", password: "Employee@123456", role: "Employee", name: "Ananya Patel", title: "Sr Developer", color: "from-sky-500 to-cyan-600" },
+  { email: "admin@goalforge.com", password: "GoalForge@2025", role: "Admin", name: "Aditya Verma", title: "HR Director", color: "from-violet-500 to-purple-600" },
+  { email: "manager@goalforge.com", password: "GoalForge@2025", role: "Manager", name: "Sunita Patel", title: "Engineering Manager", color: "from-indigo-500 to-blue-600" },
+  { email: "employee1@goalforge.com", password: "GoalForge@2025", role: "Employee", name: "Priya Sharma", title: "Sr Developer", color: "from-sky-500 to-cyan-600" },
+  { email: "employee2@goalforge.com", password: "GoalForge@2025", role: "Employee", name: "Vikram Singh", title: "Product Manager", color: "from-emerald-500 to-green-600" },
+  { email: "employee3@goalforge.com", password: "GoalForge@2025", role: "Employee", name: "Meera Reddy", title: "QA Engineer", color: "from-orange-500 to-amber-500" },
 ];
 
 const roleIcons = { Admin: Shield, Manager: Users, Employee: TrendingUp };
