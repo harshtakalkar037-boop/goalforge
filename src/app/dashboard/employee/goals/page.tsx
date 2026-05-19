@@ -72,7 +72,7 @@ function GoalFormModal({ open, onClose, onSave, goalSheet, thrustAreas, editGoal
     if (!goalSheet) { setError("No active goal sheet found. Contact your admin."); return; }
     setLoading(true); setError(null);
     try {
-      const payload = {
+      const payload: Record<string, unknown> = {
         goal_sheet_id: goalSheet.id,
         title: form.title.trim(),
         description: form.description.trim() || null,
@@ -81,6 +81,7 @@ function GoalFormModal({ open, onClose, onSave, goalSheet, thrustAreas, editGoal
         target_value: form.target_value ? parseFloat(form.target_value) : null,
         target_date: form.target_date || null,
         weightage: parseInt(form.weightage),
+        sort_order: 0,
       };
       if (editGoal) {
         const { error: err } = await supabase.from("goals").update(payload).eq("id", editGoal.id);
@@ -255,12 +256,17 @@ export default function EmployeeGoalsPage() {
           sheet = sheetData;
         } else {
           // Auto-create draft sheet
-          const { data: newSheet } = await supabase
+          const { data: newSheet, error: sheetErr } = await supabase
             .from("goal_sheets")
             .insert({ employee_id: user.id, cycle_id: cycleData.id, status: "draft" })
             .select()
             .single();
-          sheet = newSheet;
+          if (!sheetErr) sheet = newSheet;
+          else {
+            // Try fetching again in case of race condition
+            const { data: retry } = await supabase.from("goal_sheets").select("*").eq("employee_id", user.id).eq("cycle_id", cycleData.id).maybeSingle();
+            sheet = retry;
+          }
         }
       }
       setGoalSheet(sheet);
@@ -330,8 +336,7 @@ export default function EmployeeGoalsPage() {
           <Button
             className="gap-2 rounded-xl shadow-sm"
             onClick={() => { setEditGoal(null); setShowModal(true); }}
-            disabled={!goalSheet}
-          >
+            >
             <Plus className="h-4 w-4" /> Add Goal
           </Button>
         )}
