@@ -237,12 +237,13 @@ export default function EmployeeGoalsPage() {
     setLoading(true);
     try {
       // Get active cycle
-      const { data: cycleRows } = await supabase
+      const { data: cycleRows, error: cycleErr } = await supabase
         .from("performance_cycles")
         .select("*")
         .eq("status", "active")
         .order("created_at", { ascending: true })
         .limit(1);
+      console.log("[Goals] cycleRows:", cycleRows, "err:", cycleErr);
       const cycleData = cycleRows?.[0] ?? null;
       setCycle(cycleData);
 
@@ -250,12 +251,13 @@ export default function EmployeeGoalsPage() {
       let sheet: GoalSheet | null = null;
       if (cycleData) {
         // Fetch sheet - prefer approved > submitted > draft
-        const { data: sheetRows } = await supabase
+        const { data: sheetRows, error: sheetErr } = await supabase
           .from("goal_sheets")
           .select("*")
           .eq("employee_id", user.id)
           .eq("cycle_id", cycleData.id)
           .order("created_at", { ascending: false });
+        console.log("[Goals] sheetRows:", sheetRows, "err:", sheetErr, "userId:", user.id, "cycleId:", cycleData.id);
         
         if (sheetRows && sheetRows.length > 0) {
           // Pick best status: approved first, then submitted, then draft
@@ -266,14 +268,16 @@ export default function EmployeeGoalsPage() {
           sheet = sorted[0];
         } else {
           // Create new draft sheet
-          const { data: newSheet } = await supabase
+          const { data: newSheet, error: newSheetErr } = await supabase
             .from("goal_sheets")
             .insert({ employee_id: user.id, cycle_id: cycleData.id, status: "draft" })
             .select()
             .single();
+          console.log("[Goals] created sheet:", newSheet, "err:", newSheetErr);
           sheet = newSheet;
         }
       }
+      console.log("[Goals] final sheet:", sheet);
       setGoalSheet(sheet);
 
       // Get goals for this sheet
