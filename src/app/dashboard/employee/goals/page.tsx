@@ -69,7 +69,8 @@ function GoalFormModal({ open, onClose, onSave, goalSheet, thrustAreas, editGoal
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!goalSheet) { setError("No active goal sheet found. Contact your admin."); return; }
+    if (!goalSheet) { setError("Goal sheet not loaded yet — please wait a moment and try again."); return; }
+    if (goalSheet.status !== "draft") { setError("Your goal sheet is " + goalSheet.status + " and cannot be edited. Contact your admin to unlock."); return; }
     setLoading(true); setError(null);
     try {
       const payload: Record<string, unknown> = {
@@ -246,27 +247,29 @@ export default function EmployeeGoalsPage() {
       // Get or create goal sheet
       let sheet: GoalSheet | null = null;
       if (cycleData) {
-        const { data: sheetData } = await supabase
+        // Fetch sheet - prefer approved > submitted > draft
+        const { data: sheetRows } = await supabase
           .from("goal_sheets")
           .select("*")
           .eq("employee_id", user.id)
           .eq("cycle_id", cycleData.id)
-          .maybeSingle();
-        if (sheetData) {
-          sheet = sheetData;
+          .order("created_at", { ascending: false });
+        
+        if (sheetRows && sheetRows.length > 0) {
+          // Pick best status: approved first, then submitted, then draft
+          const priority = ["approved", "submitted", "draft"];
+          const sorted = [...sheetRows].sort((a, b) => 
+            priority.indexOf(a.status) - priority.indexOf(b.status)
+          );
+          sheet = sorted[0];
         } else {
-          // Auto-create draft sheet
-          const { data: newSheet, error: sheetErr } = await supabase
+          // Create new draft sheet
+          const { data: newSheet } = await supabase
             .from("goal_sheets")
             .insert({ employee_id: user.id, cycle_id: cycleData.id, status: "draft" })
             .select()
             .single();
-          if (!sheetErr) sheet = newSheet;
-          else {
-            // Try fetching again in case of race condition
-            const { data: retry } = await supabase.from("goal_sheets").select("*").eq("employee_id", user.id).eq("cycle_id", cycleData.id).maybeSingle();
-            sheet = retry;
-          }
+          sheet = newSheet;
         }
       }
       setGoalSheet(sheet);
